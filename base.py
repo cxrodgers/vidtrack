@@ -12,7 +12,7 @@ class FileSchema:
     
     Other files:
         video_filename : something ending in 'mp4'
-        database_filename : session_name.db containing a pickled dict
+        database_filename : session_name.pdict containing a pickled dict
     """
     def __init__(self, full_path):
         self.full_path = os.path.abspath(full_path)
@@ -56,7 +56,7 @@ class FileSchema:
     
     @property
     def db_filename(self):
-        return os.path.join(self.full_path, self.name + '.db')
+        return os.path.join(self.full_path, self.name + '.pdict')
 
 
 class Session:
