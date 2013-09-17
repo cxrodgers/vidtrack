@@ -1,6 +1,5 @@
 import my, my.misc, numpy as np, os, glob
 
-
 class FileSchema:
     """Object to encapsulate the file schema for a single vidtrack session
     
@@ -40,10 +39,23 @@ class FileSchema:
     def trial2image_filename(self, trial_number):
         return self.IMAGE_CONSTRUCTION_STR % trial_number
     
+    def image_filename2trial(self, image_filename):
+        # Apply regex
+        res = my.misc.apply_and_filter_by_regex(self.IMAGE_REGEX_STR, 
+            [image_filename])
+        if len(res) == 0 or len(res) > 1:
+            raise ValueError("%s doesn't uniquely match %s" % (image_filename,
+                self.IMAGE_REGEX_STR))
+        
+        # Intify
+        res_i = int(res[0])
+        return res_i
+    
     def _load_image_numbers(self):
-        all_files = glob.glob(os.path.join(self.full_path, '*.png'))
-        image_numbers = np.array(my.misc.apply_and_filter_by_regex(
-            self.IMAGE_REGEX_STR, all_files, sort=True))
+        all_files = os.listdir(self.full_path)
+        image_numbers_s = my.misc.apply_and_filter_by_regex(
+            self.IMAGE_REGEX_STR, all_files, sort=True)
+        image_numbers = np.array(map(int, image_numbers_s))
         return image_numbers
     
     @property
@@ -84,10 +96,21 @@ class Session:
         """Save a new copy of the database"""
         my.misc.pickle_dump(db, self.file_schema.db_filename)
     
+    def backup_db(self, suffix=None):
+        """Save a backup of the current db"""
+        if suffix is None:
+            import datetime
+            suffix = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        os.system('cp %s %s.%s' % (self.file_schema.db_filename, 
+            self.file_schema.db_filename, suffix))
+    
     @property
     def db(self):
         """Return current copy of the database"""
-        return my.misc.pickle_load(self.file_schema.db_filename)
+        try:
+            return my.misc.pickle_load(self.file_schema.db_filename)
+        except IOError:
+            return None
 
     @property
     def n2v_sync(self):
