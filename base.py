@@ -84,7 +84,8 @@ class Session:
         """Save a new copy of the database"""
         my.misc.pickle_dump(db, self.file_schema.db_filename)
     
-    def load_db(self, db):
+    @property
+    def db(self):
         """Return current copy of the database"""
         return my.misc.pickle_load(self.file_schema.db_filename)
 
@@ -133,3 +134,53 @@ def create_session(full_path, video_filename=None, v2n_sync=None,
         session.write_n2v_sync(n2v_sync)
 
     return session
+
+
+def dump_frames_by_trial_and_event(video_filename, event_times, trial_numbers,
+    syncing_poly=None, latency=0., suffix=None, image_dir='.', filenamer=None,
+    trial_stride=1, trial_offset=0):
+    """Given an event or times, dump frames around each event
+ 
+    video_filename : video to analyze
+    event_times : array of times of events of interest in seconds
+        A syncing polynomial ('syncing_poly') may be applied
+        and a latency ('latency') in seconds may be added.
+        Moreover, this array can be subindexed with 'trial_stride' and
+        'trial_offset'.
+        The image frame of the results will be written to disk.
+    trial_numbers : array of ints, same length as event_times
+        Used to label the images. Should be behavioral, generally.
+    filenamer : function accepting 'image_dir', trial number, and a string
+        called 'suffix' to name the file. See a default in this function.
+    """
+    # Apply the poly and the latency
+    event_times = np.polyval(syncing_poly, event_times) + latency
+    
+    # Set up the iteration
+    assert len(event_times) == len(trial_numbers)
+    iterobj = zip(
+        event_times[trial_offset::trial_stride],
+        trial_numbers[trial_offset::trial_stride])
+
+    # How to name files
+    def default_filenamer(tnum, suffix):
+        if suffix is None:
+            return os.path.join(image_dir, '%04d.png' % tnum)
+        else:
+            return os.path.join(image_dir, '%04d_%s.png' % (tnum, suffix))
+    if filenamer is None:
+        filenamer = default_filenamer
+    
+    # Iterate over trials
+    for ttime, tnum in iterobj:
+        # Calculate which frame to dump
+        frametime = ttime + latency
+        if frametime < 0:
+            continue
+        
+        # How to name file
+        output_filename = filenamer(tnum, suffix)
+        
+        # Do it
+        my.misc.frame_dump(filename=video_filename, frametime=frametime,
+            output_filename=output_filename, meth='ffmpeg fast', verbose=True)
