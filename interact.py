@@ -43,7 +43,11 @@ class Server:
         # Store info about images
         self.image_filenames = np.asarray(image_filenames)
         self.image_full_filenames = np.asarray(image_full_filenames)
-        self.image_priorities = np.asarray(image_priorities)
+        if image_priorities is not None:
+            self.image_priorities = np.asarray(image_priorities).astype(np.int)
+        else:
+            self.image_priorities = np.zeros(len(self.image_filenames)).astype(
+                np.int)
         
         # This keeps track of which image we're handling
         self.image_idx = start_index
