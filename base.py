@@ -1,4 +1,4 @@
-import my, my.misc, numpy as np, os, glob
+import my, my.misc, numpy as np, os, glob, pandas
 
 class FileSchema:
     """Object to encapsulate the file schema for a single vidtrack session
@@ -207,3 +207,33 @@ def dump_frames_by_trial_and_event(video_filename, event_times, trial_numbers,
         # Do it
         my.misc.frame_dump(filename=video_filename, frametime=frametime,
             output_filename=output_filename, meth='ffmpeg fast', verbose=True)
+
+
+def vts_db2head_pos_df(vts, in_degrees=True):
+    """Convert vidtrack-style db to dataframe of head position"""
+    # Convert to dataframe and use file_schema to get btrial
+    locdf = pandas.DataFrame.from_records(vts.db.values(), index=vts.db.keys())
+    locdf['btrial'] = [vts.file_schema.image_filename2trial(fn) for
+        fn in locdf.index]
+    locdf = locdf.set_index('btrial').sort()
+    
+    # Parse out Lx, Rx, etc separately
+    locdf['Lx'] = locdf['left'].apply(lambda arr: arr[0])
+    locdf['Rx'] = locdf['right'].apply(lambda arr: arr[0])
+    locdf['Ly'] = locdf['left'].apply(lambda arr: arr[1])
+    locdf['Ry'] = locdf['right'].apply(lambda arr: arr[1])
+    locdf = locdf.drop(['left', 'right'], axis=1)    
+
+    # Add some more cols
+    locdf['Mx'] = locdf[['Lx', 'Rx']].mean(1)
+    locdf['My'] = locdf[['Ly', 'Ry']].mean(1)
+    dx = locdf['Rx'] - locdf['Lx']
+    dy = locdf['Ry'] - locdf['Ly']
+    
+    # This needs to be done more carefully -- I think one axis is reversed
+    locdf['angl'] = np.arctan(dx / dy)
+    if in_degrees:
+        locdf['angl'] = locdf['angl'] * 180 / np.pi
+    locdf['dist'] = np.sqrt(dx ** 2 + dy ** 2)
+    
+    return locdf
