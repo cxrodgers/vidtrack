@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt, numpy as np
 import vidtrack
 import my, my.plot
 import scipy.misc
+import os
 
 DEBUG = False
 TRIM_STEP = 0.5
@@ -54,7 +55,14 @@ class Server:
         
         # Load db
         self.db_filename = db_filename
-        self.db = my.misc.pickle_load(db_filename)
+        try:
+            os.path.exists(db_filename)
+        except TypeError:
+            raise ValueError("db_filename should be filename, got %r" % db_filename)
+        if os.path.exists(db_filename):
+            self.db = my.misc.pickle_load(db_filename)
+        else:
+            self.db = {}
 
         # Flag whether to display image name
         self.hide_title = hide_title
@@ -153,6 +161,8 @@ class Server:
         
         # Display, optionally with title
         self.gfx.update_image(arr, title='' if self.hide_title else fn_short)
+        if DEBUG:
+            print "rendered image", fn_short
         
         # Read from database and draw circles
         if fn_short in self.db:
