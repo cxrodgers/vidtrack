@@ -64,6 +64,23 @@ class Server:
         else:
             self.db = {}
 
+        # Keep track of objects to track
+        self.object_l = [
+            ('cc_front', {
+                'plot_kwargs': {'color': 'b'},
+                }),
+            ('cc_back', {
+                'plot_kwargs': {'color': 'r'},
+                }),
+            ('cv_front', {
+                'plot_kwargs': {'color': 'g'},
+                }),                
+            ('cv_back', {
+                'plot_kwargs': {'color': 'pink'},
+                }),                
+            ]
+        self.object_idx = 0
+
         # Flag whether to display image name
         self.hide_title = hide_title
 
@@ -75,15 +92,32 @@ class Server:
     # Dispatch functions called whenever self.gfx detects a left or right click
     def on_left(self, click_data):
         """Save left position"""
-        self.store_location(click_data['xd'], click_data['yd'], which='left')
-        self.gfx.draw_circle(click_data['xd'], click_data['yd'], 'left')
+        self.store_location(click_data['xd'], click_data['yd'], 
+            which=self.current_object_name)
+        self.gfx.draw_circle(click_data['xd'], click_data['yd'], 
+            label=self.current_object_name, 
+            plot_kwargs=self.current_object_plot_kwargs)
+        self.next_object()
     
     def on_right(self, click_data):
         """Save right position"""
-        self.store_location(click_data['xd'], click_data['yd'], which='right')
-        self.gfx.draw_circle(click_data['xd'], click_data['yd'], 'right')
+        #~ self.store_location(click_data['xd'], click_data['yd'], which='right')
+        #~ self.gfx.draw_circle(click_data['xd'], click_data['yd'], 'right')
+        self.next_object()
+    
+    def next_object(self):
+        """Go to the next object to be assigned"""
+        self.object_idx = (self.object_idx + 1) % len(self.object_l)
+        self.gfx.set_title(self.current_object_name)
 
-
+    @property
+    def current_object_name(self):
+        return self.object_l[self.object_idx][0]
+    
+    @property
+    def current_object_plot_kwargs(self):
+        return self.object_l[self.object_idx][1]['plot_kwargs']
+    
     # Called when self.gfx detects middle click
     def on_middle(self, click_data):
         """New random image"""
@@ -160,17 +194,19 @@ class Server:
         arr = scipy.misc.imread(fn_long, flatten=True)
         
         # Display, optionally with title
-        self.gfx.update_image(arr, title='' if self.hide_title else fn_short)
+        self.gfx.update_image(arr, title=self.current_object_name)
         if DEBUG:
             print "rendered image", fn_short
         
         # Read from database and draw circles
         if fn_short in self.db:
             rec = self.db[fn_short]
-            for which in ['left', 'right']:
-                if which in rec:
-                    rrec = rec[which]
-                    cir = self.gfx.draw_circle(rrec[0], rrec[1], which)
+            for label, label_data in self.object_l:
+                plot_kwargs = label_data['plot_kwargs']
+                if label in rec:
+                    rrec = rec[label]
+                    cir = self.gfx.draw_circle(rrec[0], rrec[1], label, 
+                        plot_kwargs)
     
     def store_location(self, xd, yd, which='left'):
         """Store coordinate in database"""
@@ -258,23 +294,17 @@ class Graphics:
                 # Some other type of click outside the limits
                 pass
 
-    def draw_circle(self, xd, yd, which):
+    def draw_circle(self, xd, yd, label, plot_kwargs):
         """Draw a red or blue circle"""
         # Destory old
-        self.destroy_handle(which)
-        
-        # Decide color
-        if which == 'left':
-            color = 'b'
-        else:
-            color = 'r'
+        self.destroy_handle(label)
         
         # Draw it
-        obj, = self.ax.plot(xd, yd, color=color, marker='o')
+        obj, = self.ax.plot(xd, yd, marker='o', **plot_kwargs)
         plt.draw_if_interactive()
 
         # Keep a record
-        self.handles_d[which] = obj
+        self.handles_d[label] = obj
         return obj
     
     def destroy_all_handles(self):
@@ -308,8 +338,8 @@ class Graphics:
         self.ax.set_title(title)
 
         # Zoom
-        self.ax.set_xlim((160, 320))
-        self.ax.set_ylim((120, 0))
+        #~ self.ax.set_xlim((160, 320))
+        #~ self.ax.set_ylim((120, 0))
         
         # Trim
         my.plot.harmonize_clim_in_subplots(fig=self.f, 
@@ -324,5 +354,6 @@ class Graphics:
             trim=trim_trans(self.trim))
         plt.draw_if_interactive()
 
-
+    def set_title(self, title):
+        self.ax.set_title(title)
 
